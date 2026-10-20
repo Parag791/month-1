@@ -1,0 +1,97 @@
+# Task 3: Customer Churn Data Preparation and EDA
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Load dataset
+df = pd.read_csv("WA_Fn-UseC_-Telco-Customer-Churn.csv")
+
+print("Dataset Information:")
+print(df.info())
+print(df.describe(include="all"))
+
+# 2. Data cleaning
+df["TotalCharges"] = pd.to_numeric(
+    df["TotalCharges"].replace(r"^\s*$", np.nan, regex=True),
+    errors="coerce"
+)
+
+df = df.drop_duplicates().copy()
+
+df["TotalCharges"] = df["TotalCharges"].fillna(
+    df["MonthlyCharges"] * df["tenure"]
+)
+
+df["TotalCharges"] = df["TotalCharges"].fillna(
+    df["TotalCharges"].median()
+)
+
+print("\nMissing Values:")
+print(df.isnull().sum())
+
+# 3. Feature engineering
+df["TenureGroup"] = pd.cut(
+    df["tenure"],
+    bins=[-1, 12, 24, 48, np.inf],
+    labels=["0-12", "13-24", "25-48", "49+"]
+)
+
+df["AvgMonthlySpend"] = np.where(
+    df["tenure"] > 0,
+    df["TotalCharges"] / df["tenure"],
+    df["MonthlyCharges"]
+)
+
+# Encode target variable
+df["Churn"] = df["Churn"].map({"Yes": 1, "No": 0})
+
+# 4. Visualizations
+sns.set_theme()
+
+plt.figure(figsize=(6, 4))
+sns.countplot(data=df, x="Churn")
+plt.title("Customer Churn Count")
+plt.savefig("churn_count.png", bbox_inches="tight")
+plt.show()
+
+plt.figure(figsize=(8, 5))
+sns.barplot(data=df, x="Contract", y="Churn",
+            errorbar=None)
+plt.title("Contract Type vs Churn Rate")
+plt.savefig("contract_vs_churn.png", bbox_inches="tight")
+plt.show()
+
+plt.figure(figsize=(7, 4))
+sns.boxplot(data=df, x="Churn", y="MonthlyCharges")
+plt.title("Monthly Charges by Churn")
+plt.savefig("monthly_charges_churn.png", bbox_inches="tight")
+plt.show()
+
+numeric_df = df.select_dtypes(include=np.number)
+
+plt.figure(figsize=(10, 7))
+sns.heatmap(numeric_df.corr(), cmap="coolwarm", center=0)
+plt.title("Correlation Heatmap")
+plt.savefig("churn_correlation_heatmap.png", bbox_inches="tight")
+plt.show()
+
+plt.figure(figsize=(7, 4))
+sns.barplot(data=df, x="TenureGroup", y="Churn",
+            errorbar=None)
+plt.title("Tenure Group vs Churn Rate")
+plt.savefig("tenure_vs_churn.png", bbox_inches="tight")
+plt.show()
+
+# 5. Save cleaned dataset
+df.to_csv("telco_churn_cleaned.csv", index=False)
+
+# 6. Summary
+print("\nOverall Churn Rate:",
+      round(df["Churn"].mean() * 100, 2), "%")
+
+print("\nChurn Rate by Contract:")
+print(df.groupby("Contract", observed=True)["Churn"].mean() * 100)
+
+print("\nTask 3 completed successfully!")
